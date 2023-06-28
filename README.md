@@ -96,7 +96,7 @@ select count(*) from planet_osm_trees ;
 -- 1043665
 ```
 
-#### Point in Polygon
+### Point in Polygon
 
 ```SQL
 -- Not let's try to find all the trees in these countries
@@ -134,7 +134,7 @@ select b.osm_id,count(a.osm_id) from planet_osm_trees a join planet_osm_polygon_
 -- takes 3 sec
 ```
 
-#### Compact Polygon
+### Compact Polygon
 
 ```SQL
 -- create a function which returns compacted h3
