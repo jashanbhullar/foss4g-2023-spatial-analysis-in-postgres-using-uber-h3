@@ -107,7 +107,7 @@ select b.osm_id, count(a.osm_id) from planet_osm_trees a right join planet_osm_p
 ALTER TABLE planet_osm_trees ADD COLUMN h3_index h3index GENERATED ALWAYS AS (h3_lat_lng_to_cell(way::POINT, 7)) STORED;
 
 -- For polygons we need to do a bit of extra work
--- This function takes a pplygon and gives all the h3 index inside that polygon
+-- This function takes a polygon and gives all the h3 index inside that polygon
 CREATE OR REPLACE FUNCTION get_h3_indexes(shape geometry, index integer)
   RETURNS h3index[] AS $$
 DECLARE
