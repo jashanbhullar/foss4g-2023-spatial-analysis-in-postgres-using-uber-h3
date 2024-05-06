@@ -71,12 +71,12 @@ export PGPORT=6432
 export PGHOST=localhost
 
 # our database and extension
-psql -c "Create database osm_data;"
-psql -d osm_data -c "create extension postgis;"
+psql -c "Create database uber_h3_demo;"
+psql -d uber_h3_demo -c "create extension postgis;"
 
 # This will take some time
-osm2pgsql -c -d osm_data -x -E 4326 <osm_file>
-osm2pgsql -a -d osm_data -x -E 4326 <osm_file_2>
+osm2pgsql -c -d uber_h3_demo -x -E 4326 <osm_file>
+osm2pgsql -a -d uber_h3_demo -x -E 4326 <osm_file_2>
 ```
 
 ### Let's run some queries
@@ -86,14 +86,14 @@ Let's get a subset of data
 ```SQL
 create extension h3;
 create extension h3_postgis CASCADE;
-create table planet_osm_polygon_admin_2 as Select distinct on (osm_id) * from planet_osm_polygon where admin_level = '2';
+create table planet_osm_polygon_admin_6 as Select distinct on (osm_id) * from planet_osm_polygon where admin_level = '6';
 create table planet_osm_trees as Select * from planet_osm_point where "natural" = 'tree';
 
-select count(*) from planet_osm_polygon_admin_2 ;
--- 165
+select count(*) from planet_osm_polygon_admin_6;
+-- 5518
 
 select count(*) from planet_osm_trees ;
--- 1043665
+-- 799130
 ```
 
 ### Point in Polygon
@@ -101,10 +101,11 @@ select count(*) from planet_osm_trees ;
 ```SQL
 -- Not let's try to find all the trees in these countries
 select b.osm_id, count(a.osm_id) from planet_osm_trees a right join planet_osm_polygon_admin_2 b on ST_Within(a.way , b.way) group by b.osm_id order by count;
--- took 38 seconds
+-- Cancelled after 1000 seconds
 
 -- Let's try the h3 grid. Calculate all the h3 index for all trees
 ALTER TABLE planet_osm_trees ADD COLUMN h3_index h3index GENERATED ALWAYS AS (h3_lat_lng_to_cell(way::POINT, 7)) STORED;
+-- 4 seconds
 
 -- For polygons we need to do a bit of extra work
 -- This function takes a polygon and gives all the h3 index inside that polygon
@@ -122,15 +123,17 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- We calculate all the h3 index for all the shapes. This will take a lot of time but it's a one time process
-ALTER TABLE planet_osm_polygon_admin_2  ADD COLUMN h3_indexes h3index[] GENERATED ALWAYS AS (get_h3_indexes(way,7)) STORED;
+ALTER TABLE planet_osm_polygon_admin_6  ADD COLUMN h3_indexes h3index[] GENERATED ALWAYS AS (get_h3_indexes(way,7)) STORED;
+-- 63 seconds
 
 -- Create a flat table for faster joins and visulize this table in QGIS
-create table planet_osm_polygon_admin_2_flat as
+create table planet_osm_polygon_admin_6_flat as
 select h3_index, osm_id, h3_cell_to_boundary_geometry(h3_index) from (
-select unnest (h3_indexes) as h3_index, osm_id from planet_osm_polygon_admin_2) as a;
+select unnest (h3_indexes) as h3_index, osm_id from planet_osm_polygon_admin_6) as a;
+-- 8 seconds
 
 -- We compare the h3 index and find all the shape ids
-select b.osm_id,count(a.osm_id) from planet_osm_trees a join planet_osm_polygon_admin_2_flat b on a.h3_index = b.h3_index group by b.osm_id order by count;
+select b.osm_id,count(a.osm_id) from planet_osm_trees a join planet_osm_polygon_admin_6_flat b on a.h3_index = b.h3_index group by b.osm_id order by count;
 -- takes 3 sec
 ```
 
@@ -156,12 +159,14 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Let's create the compacted array indice
-ALTER TABLE planet_osm_polygon_admin_2  ADD COLUMN h3_indexes_compacted h3index[] GENERATED ALWAYS AS (get_h3_indexes_compact(way,7)) STORED;
+ALTER TABLE planet_osm_polygon_admin_6  ADD COLUMN h3_indexes_compacted h3index[] GENERATED ALWAYS AS (get_h3_indexes_compact(way,7)) STORED;
+-- 67 seconds
 
 -- Visualize the below table in QGIS
-create table planet_osm_polygon_admin_2_flat_compact as
+create table planet_osm_polygon_admin_6_flat_compact as
 select h3_index, osm_id, h3_cell_to_boundary_geometry(h3_index) from (
-select unnest (h3_indexes_compacted) as h3_index, osm_id from planet_osm_polygon_admin_2) as a;
+select unnest (h3_indexes_compacted) as h3_index, osm_id from planet_osm_polygon_admin_6) as a;
+-- 60 seconds
 ```
 
 ### Aggregating Data
@@ -178,7 +183,7 @@ alter table planet_osm_trees_agg ADD COLUMN h3_index_res_4_shape geometry GENERA
 
 ```
 
-## More things to try:
+## More things to try
 
 - Nearest neighbours (kRing), helpful especially in ML analysis
 - Edge function, moving from one cell to the next creating a path with h3index
