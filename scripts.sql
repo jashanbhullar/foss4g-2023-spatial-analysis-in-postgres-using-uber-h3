@@ -38,7 +38,6 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 alter table planet_osm_polygon_admin_6 add column h3_indexes h3index[] generated always as (get_h3_indexes(way, 7)) stored;
 
-
 create table planet_osm_polygon_admin_6_flat as
 select h3_index, osm_id, h3_cell_to_boundary_geometry(h3_index)
 from(
@@ -102,10 +101,9 @@ from ndvi_raster
 group by h3, filename) as B
 where sum != 'NaN';
 
-select count(*) from ndvi_hex;
-
-drop table ndvi_hex ;
+select * from ndvi_hex limit 10;
 
 alter table ndvi_hex add column h3_shape geometry generated always as (h3_cell_to_boundary_geometry(h3)) stored;
 
+select b.osm_id, avg(a.mean) from ndvi_hex a join planet_osm_polygon_admin_6_flat b on a.h3 = b.h3_index group by b.osm_id;
 
