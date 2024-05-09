@@ -70,3 +70,42 @@ create table planet_osm_polygon_admin_6_flat_compact as
 select h3_index, osm_id, h3_cell_to_boundary_geometry(h3_index) from (
 select unnest (h3_indexes_compacted) as h3_index, osm_id from planet_osm_polygon_admin_6) as a;
 
+
+-- Raster 
+
+select h3, unnest (stats) from h3_raster_summar((select rast from sample), 7);
+
+SELECT
+    (summary).h3 AS h3,
+    (h3_raster_summary_stats_agg((summary).stats)).*
+FROM (
+    SELECT h3_raster_summary((select rast from sample), 7) AS summary
+) as A
+GROUP BY h3;
+
+select rid, filename  from sample ;
+
+select h3, stats from sample_h3;
+
+alter table sample_h3 add column h3_shape geometry generated always as (h3_cell_to_boundary_geometry(h3)) stored;
+
+alter table planet_osm_trees  add column h3_shape geometry generated always as (h3_cell_to_boundary_geometry(h3_lat_lng_to_cell(way::point, 7))) stored;
+
+
+create table ndvi_hex as select *
+from(
+select(summary).h3 as h3,(h3_raster_summary_stats_agg((summary).stats)).*, filename
+from(
+    select h3_raster_summary_clip(rast, 7) as summary, filename
+from ndvi_raster
+) as A
+group by h3, filename) as B
+where sum != 'NaN';
+
+select count(*) from ndvi_hex;
+
+drop table ndvi_hex ;
+
+alter table ndvi_hex add column h3_shape geometry generated always as (h3_cell_to_boundary_geometry(h3)) stored;
+
+

@@ -2,3 +2,4 @@ australia-oceania-latest.osm.pbf
 load-data.sh 
 uber-h3.qgz
 final.*
+rasters/

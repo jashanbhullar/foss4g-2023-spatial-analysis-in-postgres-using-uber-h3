@@ -183,6 +183,49 @@ alter table planet_osm_trees_agg ADD COLUMN h3_index_res_4_shape geometry GENERA
 
 ```
 
+### Raster
+
+Once you have the raster data (I used sentinel for demo) you can load the rasters using
+
+```bash
+# Copy the raster inside docker
+docker container cp ndvi.tiff postgis-h3:/home/
+# Go inside the docker container (raster2psql is available inside the container)
+docker exec -it postgis-h3 bash
+# Load the raster
+raster2pgsql -s 4326 -F *.tiff public.ndvi_raster > tiff.sql
+```
+
+Create hex indexes from the raster table
+
+```SQL
+CREATE TABLE ndvi_hex AS
+SELECT *
+FROM
+  (SELECT (SUMMARY).h3 AS h3, (h3_raster_summary_stats_agg((SUMMARY).stats)).*,
+                                                                             filename
+   FROM
+     (SELECT h3_raster_summary_clip(rast, 7) AS SUMMARY,
+             filename
+      FROM ndvi_raster) AS A
+   GROUP BY h3,
+            filename) AS B
+WHERE SUM != 'NaN';
+
+```
+
+Create hex shapes from the indice (useful for visualization)
+
+```SQL
+ALTER TABLE ndvi_hex ADD COLUMN h3_shape geometry GENERATED always AS (h3_cell_to_boundary_geometry(h3)) stored;
+```
+
+Average of mean on shapes
+
+```SQL
+select b.osm_id, avg(a.mean) from ndvi_hex a join planet_osm_polygon_admin_6_flat b on a.h3 = b.h3_index group by b.osm_id;
+```
+
 ## More things to try
 
 - Nearest neighbours (kRing), helpful especially in ML analysis
