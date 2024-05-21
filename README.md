@@ -147,7 +147,9 @@ In our analysis we need to join the road with the GPS points, for that we'll
 - Create h3 index at multiple levels trading between speed and accuracy
 - Create h3 index for roads
 
-Documentation: [https://pgxn.org/dist/h3/docs/api.html](https://pgxn.org/dist/h3/docs/api.html)
+H3 indexes table: [https://h3geo.org/docs/core-library/restable/](https://h3geo.org/docs/core-library/restable/)
+
+API Documentation: [https://pgxn.org/dist/h3/docs/api.html](https://pgxn.org/dist/h3/docs/api.html)
 
 ```SQL
 
