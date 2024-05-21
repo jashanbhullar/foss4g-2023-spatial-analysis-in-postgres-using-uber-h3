@@ -100,7 +100,9 @@ FROM
     tracking_data_raw;
 ```
 
-For roads, we'll use an OSM export of Melbourne area
+![alt text](pictures/tracking_data.png)
+
+For roads, we'll use an OSM export of Melbourne area. Special thanks to HOTOSM for making the export tool. [https://export.hotosm.org/](https://export.hotosm.org/)
 
 ```bash
 PGPASSWORD=postgres -p 6432 -d austroads -U postgres -h localhost -f roads-data/
@@ -134,6 +136,9 @@ WHERE
 -- 33225 records
 ```
 
+![alt text](pictures/melbourne_roads.png)
+![alt text](pictures/melbourne_roads_tracking_data_zoomed.png)
+
 ### Analysis
 
 In our analysis we need to join the road with the GPS points, for that we'll
@@ -141,6 +146,8 @@ In our analysis we need to join the road with the GPS points, for that we'll
 - Create point geometry
 - Create h3 index at multiple levels trading between speed and accuracy
 - Create h3 index for roads
+
+Documentation: [https://pgxn.org/dist/h3/docs/api.html](https://pgxn.org/dist/h3/docs/api.html)
 
 ```SQL
 
@@ -154,30 +161,34 @@ ADD COLUMN point geometry (Point, 4326) generated always AS (
 ) stored;
 
 -- Create h3 index from the Point Geometry where N can be any value from 0-15.
+-- We'll use the index level 12 for this example
 ALTER TABLE tracking_data
-ADD COLUMN h3_index_[N] h3index GENERATED ALWAYS AS (
+ADD COLUMN h3_index_12 h3index GENERATED ALWAYS AS (
     h3_lat_lng_to_cell (
         ST_SetSRID (
             st_makepoint (position_longitude, position_latitude),
             4326
         ),
-        [N]
+        12
     )
 ) STORED;
 
 -- Purely for visualizing purpose we'll create h3 index boundary
-ADD COLUMN h3_index_[N]_shape geometry GENERATED ALWAYS AS (
+ALTER TABLE tracking_data
+ADD COLUMN h3_index_12_shape geometry GENERATED ALWAYS AS (
     h3_cell_to_boundary_geometry (
         h3_lat_lng_to_cell (
             ST_SetSRID (
                 st_makepoint (position_longitude, position_latitude),
                 4326
             ),
-            [N]
+            12
         )
     )
 ) STORED;
 ```
+
+![alt text](pictures/tracking_data_h3_index.png)
 
 For the roads table we need to:
 
@@ -200,7 +211,13 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- We need polygons to represent roads
-ALTER TABLE melbourne_roads  ADD COLUMN h3_indexes h3index[] GENERATED ALWAYS AS (get_h3_indexes(ST_Buffer(geom, 0.0001801802),12)) STORED;
+ALTER TABLE melbourne_roads
+ADD COLUMN h3_indexes h3index[] GENERATED ALWAYS AS (
+    get_h3_indexes(
+        ST_Buffer(geom, 0.0001801802),
+        12
+    )
+) STORED;
 
 -- Let's create a table representing the roads as h3index
 CREATE TABLE
@@ -220,6 +237,8 @@ FROM
             melbourne_roads
     ) AS a;
 ```
+
+![alt text](pictures/melbourne_raods_h3_index.png)
 
 Moment of truth
 
@@ -275,5 +294,7 @@ ORDER BY
     p.pos_id;
 -- 130ms
 ```
+
+![alt text](pictures/tracking_data_melbourne_roads_join.png)
 
 While the difference is not considerable as of now but it'll be significant with a larger sample size. The results are comparable with some points matching to multiple roads and some things are slightly different due to different algorithms. The acccuracy of the h3 index join can be increased by using a smaller index but the speed will suffer for it.
