@@ -67,7 +67,7 @@ order by
 
 select
 	p.pos_id,
-	array_agg(l.osm_id) 
+	array_agg() 
 from
 	tracking_data p
 left join melbourne_roads_flat l on
